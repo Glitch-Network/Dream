@@ -1,8 +1,10 @@
 const { createBareServer } = require('@tomphttp/bare-server-node');
 const { createServer } = require('http');
 const Fastify = require('fastify');
+const fastifyStatic = require('@fastify/static');
+const { join } = require('path');
+const { writeFileSync, mkdirSync, existsSync } = require('fs');
 const httpProxy = require('http-proxy');
-
 
 files = {
     "index.html": `<html>
@@ -334,20 +336,23 @@ for (let i = 0; i < base_64_encoded.length; i++) {
 }
 
 
-const bare = createBareServer('/bare/');
-const fastify = Fastify();
-const proxyServer = httpProxy.createProxyServer();
+function createFiles(files) {
+    for (const [filename, content] of Object.entries(files)) {
+        const filePath = join(__dirname, filename);
+        const dirPath = join(filePath, '..');
 
+        // Create directory if it doesn't exist
+        if (!existsSync(dirPath)) {
+            mkdirSync(dirPath, { recursive: true });
+        }
 
-fastify.get('*', (request, reply) => {
-    const urlPath = request.raw.url === '/' ? 'index.html' : request.raw.url.slice(1);
-
-    if (files[urlPath]) {
-        reply.type('text/html').send(files[urlPath]);
-    } else {
-        reply.code(404).type('text/plain').send('Not Found');
+        // Write the file content
+        writeFileSync(filePath, content, 'utf8');
     }
-});
+}
+
+// Create files before starting the server
+createFiles(files);
 
 const server = createServer();
 
