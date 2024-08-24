@@ -1,3 +1,9 @@
+const { createBareServer } = require('@tomphttp/bare-server-node');
+const { createServer } = require('http');
+const Fastify = require('fastify');
+const httpProxy = require('http-proxy');
+
+
 files = {
     "index.html": `<html>
     <head>
@@ -327,53 +333,44 @@ for (let i = 0; i < base_64_encoded.length; i++) {
     files[file] = string;
 }
 
-const { createBareServer } = require('@tomphttp/bare-server-node');
-const { createServer } = require('http');
-const Fastify = require('fastify');
-const fastifyStatic = require('@fastify/static');
-const { join } = require('path');
 
 const bare = createBareServer('/bare/');
 const fastify = Fastify();
 const proxyServer = httpProxy.createProxyServer();
 
-__dirname = join(__filename, '..');
 
+fastify.get('*', (request, reply) => {
+    const urlPath = request.raw.url === '/' ? 'index.html' : request.raw.url.slice(1);
 
-fastify.get('/*', (req, reply) => {
-  const fileName = req.params['*'];
-  
-  if (files[fileName]) {
-    // Return the content from the in-memory files object
-    reply.type('text/html').send(files[fileName]);
-  } else {
-    // If the file is not found in the in-memory object, return a 404 or fallback to static files
-    reply.code(404).send('File not found');
-  }
+    if (files[urlPath]) {
+        reply.type('text/html').send(files[urlPath]);
+    } else {
+        reply.code(404).type('text/plain').send('Not Found');
+    }
 });
 
 const server = createServer();
 
 server.on('request', (req, res) => {
-  if (bare.shouldRoute(req)) {
-    bare.routeRequest(req, res);
-    return;
-  }
+    if (bare.shouldRoute(req)) {
+        bare.routeRequest(req, res);
+        return;
+    }
 
-  fastify.ready(err => {
-    if (err) throw err;
-    fastify.server.emit('request', req, res);
-  });
+    fastify.ready(err => {
+        if (err) throw err;
+        fastify.server.emit('request', req, res);
+    });
 });
 
 server.on('upgrade', (req, socket, head) => {
-  if (bare.shouldRoute(req, socket, head)) {
-    bare.routeUpgrade(req, socket, head);
-  } else {
-    socket.end();
-  }
+    if (bare.shouldRoute(req, socket, head)) {
+        bare.routeUpgrade(req, socket, head);
+    } else {
+        socket.end();
+    }
 });
 
 server.listen(process.env.PORT || 8080, () => {
-  console.log(`Server listening on port ${process.env.PORT || 8080}`);
+    console.log(`Server listening on port ${process.env.PORT || 8080}`);
 });
